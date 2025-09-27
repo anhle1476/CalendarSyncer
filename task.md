@@ -31,34 +31,34 @@
   - [ ] Ghi chú các vấn đề gặp phải
   - [ ] Cập nhật tài liệu cho các bước tiếp theo
 
-## Phase 2: Tích hợp Google Calendar API (Tuần 2)
+## Phase 2: Tích hợp Google Calendar API (Tuần 2) - **HOÀN THÀNH**
 
 ### Tuần 2, Ngày 1:
-- [ ] Tạo Service Account trong Google Cloud Console
-  - [ ] Truy cập Google Cloud Console
-  - [ ] Tạo project mới hoặc sử dụng project hiện có
-  - [ ] Enable Google Calendar API
-  - [ ] Tạo Service Account và tải JSON key file
-- [ ] Cấp quyền truy cập Google Calendar
-  - [ ] Nếu dùng Google Workspace: Cấu hình Domain-wide Delegation
-  - [ ] Nếu không: Chia sẻ calendar với service account email
+- [x] Tạo Service Account trong Google Cloud Console
+  - [x] Truy cập Google Cloud Console
+  - [x] Tạo project mới hoặc sử dụng project hiện có
+  - [x] Enable Google Calendar API
+  - [x] Tạo Service Account và tải JSON key file
+- [x] Cấp quyền truy cập Google Calendar
+  - [x] Nếu dùng Google Workspace: Cấu hình Domain-wide Delegation
+  - [x] Nếu không: Chia sẻ calendar với service account email
 
 ### Tuần 2, Ngày 2-3:
-- [ ] Tích hợp thư viện Google.Apis.Calendar.v3
-  - [ ] Thêm NuGet packages cần thiết:
-    - [ ] Google.Apis.Calendar.v3
-    - [ ] Google.Apis.Auth
-  - [ ] Kiểm tra phiên bản mới nhất và tương thích
-- [ ] Xây dựng lớp truy cập Google Calendar API
-  - [ ] Tạo GoogleCalendarService.cs
-  - [ ] Hiện thực phương thức xác thực
-  - [ ] Tạo phương thức lấy danh sách sự kiện
+- [x] Tích hợp thư viện Google.Apis.Calendar.v3
+  - [x] Thêm NuGet packages cần thiết:
+    - [x] Google.Apis.Calendar.v3
+    - [x] Google.Apis.Auth
+  - [x] Kiểm tra phiên bản mới nhất và tương thích
+- [x] Xây dựng lớp truy cập Google Calendar API
+  - [x] Tạo GoogleCalendarService.cs
+  - [x] Hiện thực phương thức xác thực
+  - [x] Tạo phương thức lấy danh sách sự kiện
 
 ### Tuần 2, Ngày 4-5:
-- [ ] Xử lý xác thực Service Account
-  - [ ] Hiện thực logic đọc JSON key file
-  - [ ] Tạo credential với scope phù hợp
-  - [ ] Khởi tạo CalendarService
+- [x] Xử lý xác thực Service Account
+  - [x] Hiện thực logic đọc JSON key file
+  - [x] Tạo credential với scope phù hợp
+  - [x] Khởi tạo CalendarService
 - [ ] Kiểm thử truy vấn dữ liệu từ Google Calendar
   - [ ] Viết unit test cho GoogleCalendarService
   - [ ] Kiểm tra kết nối và truy vấn sự kiện

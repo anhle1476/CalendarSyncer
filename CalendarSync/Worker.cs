@@ -1,54 +1,55 @@
+namespace CalendarSync;
+
 using CalendarSync.Models;
+using CalendarSync.Services;
 using Microsoft.Extensions.Options;
 
-namespace CalendarSync
+public class Worker : BackgroundService
 {
-    /// <summary>
-    /// Main worker service that handles calendar synchronization
-    /// </summary>
-    public class Worker : BackgroundService
+    private readonly ILogger<Worker> _logger;
+    private readonly SyncSettings _syncSettings;
+    private readonly IGoogleCalendarService _googleCalendarService;
+
+    public Worker(ILogger<Worker> logger, IOptions<SyncSettings> syncOptions, IGoogleCalendarService googleCalendarService)
     {
-        private readonly ILogger<Worker> _logger;
-        private readonly SyncSettings _syncSettings;
+        _logger = logger;
+        _syncSettings = syncOptions.Value;
+        _googleCalendarService = googleCalendarService;
+    }
 
-        public Worker(ILogger<Worker> logger, IOptions<SyncSettings> syncSettings)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("CalendarSyncService Worker started at: {time}", DateTimeOffset.Now);
+        _logger.LogInformation("Sync interval configured to: {interval} minutes", _syncSettings.IntervalMinutes);
+
+        while (!stoppingToken.IsCancellationRequested)
         {
-            _logger = logger;
-            _syncSettings = syncSettings.Value;
-        }
-
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            _logger.LogInformation("CalendarSyncService Worker started at: {time}", DateTimeOffset.Now);
-            _logger.LogInformation("Sync interval configured to: {interval} minutes", _syncSettings.IntervalMinutes);
-
-            while (!stoppingToken.IsCancellationRequested)
+            try
             {
-                try
-                {
-                    _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
-                    
-                    // TODO: Phase 2 - Add Google Calendar API integration
-                    // TODO: Phase 3 - Add database synchronization
-                    // TODO: Phase 4 - Add UDP notifications
-                    
-                    await Task.Delay(TimeSpan.FromMinutes(_syncSettings.IntervalMinutes), stoppingToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    // Expected when cancellation is requested
-                    _logger.LogInformation("Worker cancellation requested");
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error occurred in Worker execution");
-                    // Wait a bit before retrying to avoid rapid failure loops
-                    await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
-                }
-            }
+                _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
 
-            _logger.LogInformation("CalendarSyncService Worker stopped at: {time}", DateTimeOffset.Now);
+                var events = await _googleCalendarService.GetEventsAsync(stoppingToken);
+                if (events != null)
+                {
+                    _logger.LogInformation("Successfully retrieved {count} events from Google Calendar.", events.Count);
+                }
+
+                await Task.Delay(TimeSpan.FromMinutes(_syncSettings.IntervalMinutes), stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when cancellation is requested
+                _logger.LogInformation("Worker cancellation requested");
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred in Worker execution");
+                // Wait a bit before retrying to avoid rapid failure loops
+                await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+            }
         }
+
+        _logger.LogInformation("CalendarSyncService Worker stopped at: {time}", DateTimeOffset.Now);
     }
 }
