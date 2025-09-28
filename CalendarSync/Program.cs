@@ -39,6 +39,7 @@ try
         builder.Configuration.GetSection("Notification"));
 
     // Register custom services
+    builder.Services.AddSingleton<ICalendarWrapper, CalendarWrapper>();
     builder.Services.AddSingleton<IGoogleCalendarService, GoogleCalendarService>();
 
     // Register Google Calendar Service
@@ -66,41 +67,9 @@ try
     });
 
     // Register the Worker service
-    IHost host = Host.CreateDefaultBuilder(args)
-        .ConfigureServices((hostContext, services) =>
-        {
-            services.AddHostedService<Worker>();
-    
-            // Add configuration
-            services.Configure<AppSettings>(hostContext.Configuration.GetSection("AppSettings"));
-    
-            // Add Google Calendar Service
-            services.AddSingleton(provider =>
-            {
-                var clientSecrets = new ClientSecrets
-                {
-                    ClientId = hostContext.Configuration["AppSettings:Google:ClientId"],
-                    ClientSecret = hostContext.Configuration["AppSettings:Google:ClientSecret"]
-                };
-    
-                var credential = GoogleWebAuthorizationBroker.AuthorizeAsync(
-                    clientSecrets,
-                    new[] { CalendarService.Scope.CalendarReadonly },
-                    "user",
-                    CancellationToken.None).Result;
-    
-                return new CalendarService(new BaseClientService.Initializer()
-                {
-                    HttpClientInitializer = credential,
-                    ApplicationName = "Calendar Sync"
-                });
-            });
-    
-            services.AddSingleton<ICalendarWrapper, CalendarWrapper>();
-            services.AddSingleton<IGoogleCalendarService, GoogleCalendarService>();
-        })
-        .Build();
-    
+    builder.Services.AddHostedService<Worker>();
+
+    var host = builder.Build();
     host.Run();
 }
 catch (Exception ex)

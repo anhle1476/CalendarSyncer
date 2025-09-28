@@ -9,12 +9,38 @@ public class Worker : BackgroundService
     private readonly ILogger<Worker> _logger;
     private readonly SyncSettings _syncSettings;
     private readonly IGoogleCalendarService _googleCalendarService;
+    private readonly ICalendarWrapper _calendarWrapper;
+    private readonly IHostApplicationLifetime _appLifetime;
 
-    public Worker(ILogger<Worker> logger, IOptions<SyncSettings> syncOptions, IGoogleCalendarService googleCalendarService)
+    public Worker(ILogger<Worker> logger, 
+        IOptions<SyncSettings> syncOptions, 
+        IGoogleCalendarService googleCalendarService, 
+        ICalendarWrapper calendarWrapper, 
+        IHostApplicationLifetime appLifetime)
     {
         _logger = logger;
         _syncSettings = syncOptions.Value;
         _googleCalendarService = googleCalendarService;
+        _calendarWrapper = calendarWrapper;
+        _appLifetime = appLifetime;
+    }
+
+    public override async Task StartAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("Verifying calendar access...");
+            await _calendarWrapper.EnsureCalendarExistsAsync(cancellationToken);
+            _logger.LogInformation("Successfully verified calendar access.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogCritical(ex, "Failed to verify calendar access. The application will now stop.");
+            _appLifetime.StopApplication();
+            return;
+        }
+
+        await base.StartAsync(cancellationToken);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

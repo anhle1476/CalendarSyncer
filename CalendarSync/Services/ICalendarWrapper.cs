@@ -7,5 +7,6 @@ namespace CalendarSync.Services
     public interface ICalendarWrapper
     {
         Task<Events> ListEventsAsync(CancellationToken cancellationToken);
+        Task EnsureCalendarExistsAsync(CancellationToken cancellationToken);
     }
 }
