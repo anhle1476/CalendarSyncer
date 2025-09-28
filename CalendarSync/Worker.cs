@@ -9,20 +9,27 @@ public class Worker : BackgroundService
     private readonly ILogger<Worker> _logger;
     private readonly SyncSettings _syncSettings;
     private readonly IGoogleCalendarService _googleCalendarService;
-    private readonly ICalendarWrapper _calendarWrapper;
+    private readonly IDatabaseService _databaseService;
+    private readonly INotificationService _notificationService;
+    private readonly GoogleSettings _googleSettings;
     private readonly IHostApplicationLifetime _appLifetime;
 
-    public Worker(ILogger<Worker> logger, 
-        IOptions<SyncSettings> syncOptions, 
+    public Worker(
+        ILogger<Worker> logger, 
         IGoogleCalendarService googleCalendarService, 
-        ICalendarWrapper calendarWrapper, 
-        IHostApplicationLifetime appLifetime)
+        IDatabaseService databaseService,
+        IHostApplicationLifetime appLifetime,
+        INotificationService notificationService,
+        IOptions<GoogleSettings> googleSettings,
+        IOptions<SyncSettings> syncSettings)
     {
         _logger = logger;
-        _syncSettings = syncOptions.Value;
         _googleCalendarService = googleCalendarService;
-        _calendarWrapper = calendarWrapper;
+        _databaseService = databaseService;
+        _notificationService = notificationService;
+        _googleSettings = googleSettings.Value;
         _appLifetime = appLifetime;
+        _syncSettings = syncSettings.Value;
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken)
@@ -30,7 +37,7 @@ public class Worker : BackgroundService
         try
         {
             _logger.LogInformation("Verifying calendar access...");
-            await _calendarWrapper.EnsureCalendarExistsAsync(cancellationToken);
+            await _googleCalendarService.EnsureCalendarExistsAsync(cancellationToken);
             _logger.LogInformation("Successfully verified calendar access.");
         }
         catch (Exception ex)
@@ -48,16 +55,63 @@ public class Worker : BackgroundService
         _logger.LogInformation("CalendarSyncService Worker started at: {time}", DateTimeOffset.Now);
         _logger.LogInformation("Sync interval configured to: {interval} minutes", _syncSettings.IntervalMinutes);
 
+        // Perform initial full sync if necessary
+        await PerformInitialSyncAsync(stoppingToken);
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
 
-                var events = await _googleCalendarService.GetEventsAsync(stoppingToken);
-                if (events != null)
+                var syncToken = await _databaseService.GetLastSyncTokenAsync(_googleSettings.CalendarId);
+                var eventsResult = await _googleCalendarService.GetEventsAsync(syncToken, stoppingToken);
+
+                if (eventsResult?.Items != null)
                 {
-                    _logger.LogInformation("Successfully retrieved {count} events from Google Calendar.", events.Count);
+                    _logger.LogInformation("Successfully retrieved {count} events from Google Calendar.", eventsResult.Items.Count);
+                    foreach (var googleEvent in eventsResult.Items)
+                    {
+                        _logger.LogDebug("Processing event {EventId} with status {Status}", googleEvent.Id, googleEvent.Status);
+                        if (googleEvent.Status == "cancelled")
+                        {
+                            await _databaseService.DeleteEventAsync(googleEvent.Id);
+                            _logger.LogInformation("Deleted event {EventId} from local database.", googleEvent.Id);
+                            await _notificationService.SendNotificationAsync($"Event deleted: {googleEvent.Id}");
+                        }
+                        else
+                        {
+                            var calendarEvent = new CalendarEvent
+                            {
+                                EventID = googleEvent.Id,
+                                CalendarID = _googleSettings.CalendarId,
+                                Summary = googleEvent.Summary,
+                                Description = googleEvent.Description,
+                                Location = googleEvent.Location,
+                                StartTime = googleEvent.Start?.DateTimeDateTimeOffset?.DateTime,
+                                EndTime = googleEvent.End?.DateTimeDateTimeOffset?.DateTime,
+                                CreatedTime = googleEvent.CreatedDateTimeOffset?.DateTime,
+                                UpdatedTime = googleEvent.UpdatedDateTimeOffset?.DateTime,
+                                Status = googleEvent.Status,
+                                OrganizerEmail = googleEvent.Organizer?.Email,
+                                Attendees = googleEvent.Attendees != null ? string.Join(",", googleEvent.Attendees.Select(a => a.Email)) : null,
+                                Recurrence = googleEvent.Recurrence != null ? string.Join(";", googleEvent.Recurrence) : null
+                            };
+                            await _databaseService.UpsertEventAsync(calendarEvent);
+                            _logger.LogInformation("Upserted event {EventId} to local database.", googleEvent.Id);
+                            await _notificationService.SendNotificationAsync($"Event upserted: {googleEvent.Id}");
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("No new events to sync.");
+                }
+
+                if (!string.IsNullOrEmpty(eventsResult.NextSyncToken) && eventsResult.NextSyncToken != syncToken)
+                {
+                    await _databaseService.UpdateLastSyncTokenAsync(_googleSettings.CalendarId, eventsResult.NextSyncToken);
+                    _logger.LogInformation("New sync token saved.");
                 }
 
                 await Task.Delay(TimeSpan.FromMinutes(_syncSettings.IntervalMinutes), stoppingToken);
@@ -68,6 +122,12 @@ public class Worker : BackgroundService
                 _logger.LogInformation("Worker cancellation requested");
                 break;
             }
+            catch (Google.GoogleApiException ex)
+            {
+                _logger.LogError(ex, "A Google API error occurred: {Message}", ex.Message);
+                // Exponential backoff or similar retry strategy could be implemented here
+                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken); 
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error occurred in Worker execution");
@@ -77,5 +137,63 @@ public class Worker : BackgroundService
         }
 
         _logger.LogInformation("CalendarSyncService Worker stopped at: {time}", DateTimeOffset.Now);
+    }
+
+    private async Task PerformInitialSyncAsync(CancellationToken cancellationToken)
+    {
+        var lastSyncToken = await _databaseService.GetLastSyncTokenAsync(_googleSettings.CalendarId);
+        if (string.IsNullOrEmpty(lastSyncToken))
+        {
+            _logger.LogInformation("No sync token found. Performing initial full sync...");
+
+            var allEvents = await _googleCalendarService.GetAllEventsAsync(cancellationToken);
+
+            if (allEvents != null)
+            {
+                foreach (var googleEvent in allEvents)
+                {
+                    var calendarEvent = new CalendarEvent
+                    {
+                        EventID = googleEvent.Id,
+                        CalendarID = _googleSettings.CalendarId,
+                        Summary = googleEvent.Summary,
+                        Description = googleEvent.Description,
+                        Location = googleEvent.Location,
+                        StartTime = googleEvent.Start?.DateTimeDateTimeOffset?.DateTime,
+                        EndTime = googleEvent.End?.DateTimeDateTimeOffset?.DateTime,
+                        CreatedTime = googleEvent.CreatedDateTimeOffset?.DateTime,
+                        UpdatedTime = googleEvent.UpdatedDateTimeOffset?.DateTime,
+                        Status = googleEvent.Status,
+                        OrganizerEmail = googleEvent.Organizer?.Email,
+                        Attendees = googleEvent.Attendees != null ? string.Join(",", googleEvent.Attendees.Select(a => a.Email)) : null,
+                        Recurrence = googleEvent.Recurrence != null ? string.Join(";", googleEvent.Recurrence) : null
+                    };
+
+                    await _databaseService.UpsertEventAsync(calendarEvent);
+                }
+
+                _logger.LogInformation("Initial full sync completed. {count} events synced.", allEvents.Count);
+
+                // After a full sync, the API provides a sync token for future incremental syncs.
+                // We need to get it from the response of the last page of events.
+                // This part is tricky because GetAllEventsAsync abstracts away the pages.
+                // Let's assume for now that the sync token is available after GetAllEventsAsync.
+                // We will refine this logic.
+
+                // For now, we'll fetch events again to get a sync token.
+                var eventsResult = await _googleCalendarService.GetEventsAsync(null, cancellationToken);
+                var newSyncToken = eventsResult.NextSyncToken;
+
+                if (!string.IsNullOrEmpty(newSyncToken))
+                {
+                    await _databaseService.UpdateLastSyncTokenAsync(_googleSettings.CalendarId, newSyncToken);
+                    _logger.LogInformation("New sync token saved.");
+                }
+            }
+        }
+        else
+        {
+            _logger.LogInformation("Existing sync token found. Skipping initial full sync.");
+        }
     }
 }

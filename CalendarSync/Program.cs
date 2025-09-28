@@ -39,35 +39,23 @@ try
         builder.Configuration.GetSection("Notification"));
 
     // Register custom services
-    builder.Services.AddSingleton<ICalendarWrapper, CalendarWrapper>();
+    builder.Services.AddSingleton<IDatabaseService, DatabaseService>();
     builder.Services.AddSingleton<IGoogleCalendarService, GoogleCalendarService>();
+    builder.Services.AddSingleton<INotificationService, UdpNotificationService>();
+    builder.Services.AddHostedService<Worker>();
 
-    // Register Google Calendar Service
+    // Add Google Calendar Service
     builder.Services.AddSingleton(provider =>
     {
         var googleSettings = provider.GetRequiredService<IOptions<GoogleSettings>>().Value;
-
-        if (string.IsNullOrEmpty(googleSettings.ServiceAccountKeyPath))
+        var credentials = GoogleCredential.FromFile(googleSettings.ServiceAccountKeyPath)
+            .CreateScoped(CalendarService.Scope.Calendar);
+        return new CalendarService(new BaseClientService.Initializer
         {
-            throw new ArgumentNullException(nameof(googleSettings.ServiceAccountKeyPath), "ServiceAccountKeyPath is not configured in appsettings.json");
-        }
-
-        using var stream = new FileStream(googleSettings.ServiceAccountKeyPath, FileMode.Open, FileAccess.Read);
-        var credential = GoogleCredential.FromStream(stream)
-            .CreateScoped(new[] {
-                CalendarService.Scope.Calendar,
-                CalendarService.Scope.CalendarEvents
-            });
-
-        return new CalendarService(new BaseClientService.Initializer()
-        {
-            HttpClientInitializer = credential,
+            HttpClientInitializer = credentials,
             ApplicationName = "CalendarSyncService"
         });
     });
-
-    // Register the Worker service
-    builder.Services.AddHostedService<Worker>();
 
     var host = builder.Build();
     host.Run();
