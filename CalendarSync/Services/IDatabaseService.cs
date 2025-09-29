@@ -27,12 +27,14 @@ namespace CalendarSync.Services
         /// Upserts a calendar event into the database.
         /// </summary>
         /// <param name="calendarEvent">The calendar event to upsert.</param>
-        Task UpsertEventAsync(CalendarEvent calendarEvent);
+        /// <returns>Returns "added" if event was inserted, "updated" if event was modified.</returns>
+        Task<string> UpsertEventAsync(CalendarEvent calendarEvent);
 
         /// <summary>
         /// Deletes a calendar event from the database.
         /// </summary>
         /// <param name="eventId">The ID of the event to delete.</param>
-        Task DeleteEventAsync(string eventId);
+        /// <returns>Returns true if event was deleted, false if event was not found.</returns>
+        Task<bool> DeleteEventAsync(string eventId);
     }
 }

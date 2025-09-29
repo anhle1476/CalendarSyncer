@@ -64,20 +64,39 @@ public class Worker : BackgroundService
             {
                 _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
 
+                // Send sync started notification
+                await _notificationService.SendSyncStatusNotificationAsync("started", _googleSettings.CalendarId, 0);
+
                 var syncToken = await _databaseService.GetLastSyncTokenAsync(_googleSettings.CalendarId);
                 var eventsResult = await _googleCalendarService.GetEventsAsync(syncToken, stoppingToken);
+
+                int processedEventCount = 0;
 
                 if (eventsResult?.Items != null)
                 {
                     _logger.LogInformation("Successfully retrieved {count} events from Google Calendar.", eventsResult.Items.Count);
+                    processedEventCount = eventsResult.Items.Count;
+                    
                     foreach (var googleEvent in eventsResult.Items)
                     {
                         _logger.LogDebug("Processing event {EventId} with status {Status}", googleEvent.Id, googleEvent.Status);
                         if (googleEvent.Status == "cancelled")
                         {
-                            await _databaseService.DeleteEventAsync(googleEvent.Id);
-                            _logger.LogInformation("Deleted event {EventId} from local database.", googleEvent.Id);
-                            await _notificationService.SendNotificationAsync($"Event deleted: {googleEvent.Id}");
+                            var wasDeleted = await _databaseService.DeleteEventAsync(googleEvent.Id);
+                            if (wasDeleted)
+                            {
+                                _logger.LogInformation("Deleted event {EventId} from local database.", googleEvent.Id);
+                                
+                                // Send UDP notification for deleted event
+                                try
+                                {
+                                    await _notificationService.SendEventChangeNotificationAsync(googleEvent.Id, "deleted");
+                                }
+                                catch (System.Exception ex)
+                                {
+                                    _logger.LogWarning(ex, "Failed to send UDP notification for event {EventId} deletion", googleEvent.Id);
+                                }
+                            }
                         }
                         else
                         {
@@ -97,9 +116,19 @@ public class Worker : BackgroundService
                                 Attendees = googleEvent.Attendees != null ? string.Join(",", googleEvent.Attendees.Select(a => a.Email)) : null,
                                 Recurrence = googleEvent.Recurrence != null ? string.Join(";", googleEvent.Recurrence) : null
                             };
-                            await _databaseService.UpsertEventAsync(calendarEvent);
+                            var changeType = await _databaseService.UpsertEventAsync(calendarEvent);
                             _logger.LogInformation("Upserted event {EventId} to local database.", googleEvent.Id);
-                            await _notificationService.SendNotificationAsync($"Event upserted: {googleEvent.Id}");
+                            
+                            // Send UDP notification for upserted event
+                            try
+                            {
+                                await _notificationService.SendEventChangeNotificationAsync(googleEvent.Id, changeType);
+                            }
+                            catch (System.Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Failed to send UDP notification for event {EventId} change: {ChangeType}", 
+                                    googleEvent.Id, changeType);
+                            }
                         }
                     }
                 }
@@ -114,6 +143,9 @@ public class Worker : BackgroundService
                     _logger.LogInformation("New sync token saved.");
                 }
 
+                // Send sync completed notification
+                await _notificationService.SendSyncStatusNotificationAsync("completed", _googleSettings.CalendarId, processedEventCount);
+
                 await Task.Delay(TimeSpan.FromMinutes(_syncSettings.IntervalMinutes), stoppingToken);
             }
             catch (OperationCanceledException)
@@ -125,12 +157,20 @@ public class Worker : BackgroundService
             catch (Google.GoogleApiException ex)
             {
                 _logger.LogError(ex, "A Google API error occurred: {Message}", ex.Message);
+                
+                // Send sync failed notification
+                await _notificationService.SendSyncStatusNotificationAsync("failed", _googleSettings.CalendarId, 0);
+                
                 // Exponential backoff or similar retry strategy could be implemented here
                 await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken); 
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error occurred in Worker execution");
+                
+                // Send sync failed notification
+                await _notificationService.SendSyncStatusNotificationAsync("failed", _googleSettings.CalendarId, 0);
+                
                 // Wait a bit before retrying to avoid rapid failure loops
                 await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
             }
@@ -169,7 +209,18 @@ public class Worker : BackgroundService
                         Recurrence = googleEvent.Recurrence != null ? string.Join(";", googleEvent.Recurrence) : null
                     };
 
-                    await _databaseService.UpsertEventAsync(calendarEvent);
+                    var changeType = await _databaseService.UpsertEventAsync(calendarEvent);
+                    
+                    // Send UDP notification for upserted event
+                    try
+                    {
+                        await _notificationService.SendEventChangeNotificationAsync(googleEvent.Id, changeType);
+                    }
+                    catch (System.Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to send UDP notification for event {EventId} change: {ChangeType}", 
+                            googleEvent.Id, changeType);
+                    }
                 }
 
                 _logger.LogInformation("Initial full sync completed. {count} events synced.", allEvents.Count);

@@ -4,6 +4,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 
 namespace CalendarSync.Services
 {
@@ -13,10 +14,14 @@ namespace CalendarSync.Services
     public class DatabaseService : IDatabaseService
     {
         private readonly string _connectionString;
+        private readonly ILogger<DatabaseService> _logger;
 
-        public DatabaseService(IOptions<DatabaseSettings> databaseSettings)
+        public DatabaseService(
+            IOptions<DatabaseSettings> databaseSettings,
+            ILogger<DatabaseService> logger)
         {
             _connectionString = databaseSettings.Value.ConnectionString;
+            _logger = logger;
         }
 
         /// <summary>
@@ -59,8 +64,10 @@ namespace CalendarSync.Services
         /// Upserts a calendar event into the database.
         /// </summary>
         /// <param name="calendarEvent">The calendar event to upsert.</param>
-        public async Task UpsertEventAsync(CalendarEvent calendarEvent)
+        /// <returns>Returns "added" if event was inserted, "updated" if event was modified.</returns>
+        public async Task<string> UpsertEventAsync(CalendarEvent calendarEvent)
         {
+            const string checkExistsSql = "SELECT COUNT(1) FROM CalendarEvents WHERE EventID = @EventID;";
             const string sql = @"
                 MERGE CalendarEvents AS target
                 USING (SELECT @EventID AS EventID) AS source
@@ -84,7 +91,17 @@ namespace CalendarSync.Services
 
             using (var connection = new SqlConnection(_connectionString))
             {
+                // Check if event exists to determine if this is an update or insert
+                var existsCount = await connection.QuerySingleAsync<int>(checkExistsSql, new { EventID = calendarEvent.EventID });
+                bool isUpdate = existsCount > 0;
+
+                // Execute the upsert
                 await connection.ExecuteAsync(sql, calendarEvent);
+
+                string changeType = isUpdate ? "updated" : "added";
+                _logger.LogDebug("Event {EventId} was {ChangeType}", calendarEvent.EventID, changeType);
+                
+                return changeType;
             }
         }
 
@@ -92,12 +109,22 @@ namespace CalendarSync.Services
         /// Deletes a calendar event from the database.
         /// </summary>
         /// <param name="eventId">The ID of the event to delete.</param>
-        public async Task DeleteEventAsync(string eventId)
+        /// <returns>Returns true if event was deleted, false if event was not found.</returns>
+        public async Task<bool> DeleteEventAsync(string eventId)
         {
             const string sql = "DELETE FROM CalendarEvents WHERE EventID = @EventID;";
             using (var connection = new SqlConnection(_connectionString))
             {
-                await connection.ExecuteAsync(sql, new { EventID = eventId });
+                var rowsAffected = await connection.ExecuteAsync(sql, new { EventID = eventId });
+                
+                // Only log if event was actually deleted
+                if (rowsAffected > 0)
+                {
+                    _logger.LogDebug("Event {EventId} was deleted", eventId);
+                    return true;
+                }
+                
+                return false;
             }
         }
     }

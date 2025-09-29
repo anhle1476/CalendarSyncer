@@ -39,9 +39,11 @@ try
         builder.Configuration.GetSection("Notification"));
 
     // Register custom services
+    builder.Services.AddSingleton<UdpNotificationService>();
+    builder.Services.AddSingleton<INotificationService>(provider => 
+        provider.GetRequiredService<UdpNotificationService>());
     builder.Services.AddSingleton<IDatabaseService, DatabaseService>();
     builder.Services.AddSingleton<IGoogleCalendarService, GoogleCalendarService>();
-    builder.Services.AddSingleton<INotificationService, UdpNotificationService>();
     builder.Services.AddHostedService<Worker>();
 
     // Add Google Calendar Service
