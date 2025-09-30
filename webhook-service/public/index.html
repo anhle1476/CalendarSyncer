@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar Webhook Service Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-calendar-alt"></i> Calendar Webhook Service</h1>
+                <div class="status-indicator" id="statusIndicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Checking...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Dashboard -->
+        <main class="main-content">
+            <!-- Statistics Cards -->
+            <section class="stats-section">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-bell"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>Total Events</h3>
+                            <p class="stat-number" id="totalEvents">0</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-plus-circle"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>Created</h3>
+                            <p class="stat-number" id="createdEvents">0</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-edit"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>Updated</h3>
+                            <p class="stat-number" id="updatedEvents">0</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-trash"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>Deleted</h3>
+                            <p class="stat-number" id="deletedEvents">0</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Service Status -->
+            <section class="status-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-heartbeat"></i> Service Status</h2>
+                    <button class="refresh-btn" id="refreshBtn">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                
+                <div class="status-grid">
+                    <div class="status-card" id="webhookStatus">
+                        <div class="status-header">
+                            <h3><i class="fas fa-webhook"></i> Webhook Service</h3>
+                            <span class="status-badge">Unknown</span>
+                        </div>
+                        <div class="status-details">
+                            <p>Uptime: <span id="webhookUptime">-</span></p>
+                            <p>Channels: <span id="activeChannels">0</span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="status-card" id="rabbitmqStatus">
+                        <div class="status-header">
+                            <h3><i class="fas fa-exchange-alt"></i> RabbitMQ</h3>
+                            <span class="status-badge">Unknown</span>
+                        </div>
+                        <div class="status-details">
+                            <p>Connected: <span id="rabbitmqConnected">-</span></p>
+                            <p>Queue: <span id="rabbitmqQueue">-</span></p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Recent Events -->
+            <section class="events-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-list"></i> Recent Events</h2>
+                    <div class="filter-controls">
+                        <select id="eventTypeFilter">
+                            <option value="">All Types</option>
+                            <option value="created">Created</option>
+                            <option value="updated">Updated</option>
+                            <option value="deleted">Deleted</option>
+                            <option value="sync">Sync</option>
+                        </select>
+                        <select id="calendarFilter">
+                            <option value="">All Calendars</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="events-container">
+                    <div class="events-table-wrapper">
+                        <table class="events-table" id="eventsTable">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Type</th>
+                                    <th>Calendar</th>
+                                    <th>Event ID</th>
+                                    <th>Channel</th>
+                                </tr>
+                            </thead>
+                            <tbody id="eventsTableBody">
+                                <tr>
+                                    <td colspan="5" class="no-data">Loading events...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Webhook Channels -->
+            <section class="channels-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-broadcast-tower"></i> Webhook Channels</h2>
+                </div>
+                
+                <div class="channels-container">
+                    <div class="channels-grid" id="channelsGrid">
+                        <div class="no-data">Loading channels...</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- System Information -->
+            <section class="system-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-server"></i> System Information</h2>
+                </div>
+                
+                <div class="system-grid">
+                    <div class="system-card">
+                        <h3>Environment</h3>
+                        <div class="system-details">
+                            <p>Node.js: <span id="nodeVersion">-</span></p>
+                            <p>Environment: <span id="nodeEnv">-</span></p>
+                            <p>Platform: <span id="platform">-</span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="system-card">
+                        <h3>Memory Usage</h3>
+                        <div class="system-details">
+                            <p>Used: <span id="memoryUsed">-</span> MB</p>
+                            <p>Total: <span id="memoryTotal">-</span> MB</p>
+                            <p>RSS: <span id="memoryRss">-</span> MB</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy; 2024 Calendar Sync Service - Webhook Dashboard</p>
+            <p>Last updated: <span id="lastUpdated">-</span></p>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div class="modal" id="errorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> Error</h3>
+                <button class="modal-close" id="errorModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="errorMessage">An error occurred</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
