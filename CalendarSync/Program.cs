@@ -1,6 +1,9 @@
 using CalendarSync;
 using CalendarSync.Models;
 using CalendarSync.Services;
+using CalendarSync.Strategies;
+using CalendarSync.EventProcessing;
+using CalendarSync.Utilities;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Services;
@@ -48,6 +51,11 @@ try
     builder.Services.AddSingleton<IGoogleCalendarService, GoogleCalendarService>();
     builder.Services.AddSingleton<IRabbitMQService, RabbitMQService>();
     builder.Services.AddSingleton<IWebhookHealthService, WebhookHealthService>();
+    builder.Services.AddSingleton<IEventProcessor, EventProcessor>();
+    builder.Services.AddSingleton<IDebounceService, DebounceService>();
+    builder.Services.AddSingleton<WebhookSyncStrategy>();
+    builder.Services.AddSingleton<PollingSyncStrategy>();
+    builder.Services.AddSingleton<ISyncOrchestrator, HybridSyncOrchestrator>();
     builder.Services.AddHostedService<Worker>();
 
     // Add Google Calendar Service
