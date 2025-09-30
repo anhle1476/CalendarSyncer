@@ -87,5 +87,60 @@ namespace CalendarSync.Services
                     _googleSettings.CalendarId);
             }
         }
+
+        public async Task<Channel> RegisterWebhookAsync(string webhookUrl, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var channel = new Channel
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Type = "web_hook",
+                    Address = $"{webhookUrl}/webhook/calendar",
+                    Token = Guid.NewGuid().ToString(),
+                    Expiration = DateTimeOffset.UtcNow.AddDays(7).ToUnixTimeMilliseconds() // 7 days from now
+                };
+
+                _logger.LogInformation("Registering webhook for calendar {CalendarId} with URL: {WebhookUrl}", 
+                    _googleSettings.CalendarId, channel.Address);
+
+                var request = _calendarService.Events.Watch(channel, _googleSettings.CalendarId);
+                var result = await request.ExecuteAsync(cancellationToken);
+
+                _logger.LogInformation("Webhook registered successfully. Channel ID: {ChannelId}, Resource ID: {ResourceId}", 
+                    result.Id, result.ResourceId);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to register webhook for calendar {CalendarId}", _googleSettings.CalendarId);
+                throw;
+            }
+        }
+
+        public async Task StopWebhookAsync(string channelId, string resourceId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var channel = new Channel
+                {
+                    Id = channelId,
+                    ResourceId = resourceId
+                };
+
+                _logger.LogInformation("Stopping webhook channel {ChannelId} with resource ID {ResourceId}", 
+                    channelId, resourceId);
+
+                await _calendarService.Channels.Stop(channel).ExecuteAsync(cancellationToken);
+
+                _logger.LogInformation("Webhook channel {ChannelId} stopped successfully", channelId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to stop webhook channel {ChannelId}", channelId);
+                throw;
+            }
+        }
     }
 }

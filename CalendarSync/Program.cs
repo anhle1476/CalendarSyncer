@@ -37,13 +37,17 @@ try
         builder.Configuration.GetSection("Sync"));
     builder.Services.Configure<NotificationSettings>(
         builder.Configuration.GetSection("Notification"));
+    builder.Services.Configure<RabbitMQSettings>(
+        builder.Configuration.GetSection("RabbitMQ"));
+    builder.Services.Configure<WebhookSettings>(
+        builder.Configuration.GetSection("Webhook"));
 
     // Register custom services
-    builder.Services.AddSingleton<UdpNotificationService>();
-    builder.Services.AddSingleton<INotificationService>(provider => 
-        provider.GetRequiredService<UdpNotificationService>());
+    builder.Services.AddSingleton<INotificationService, UdpNotificationService>();
     builder.Services.AddSingleton<IDatabaseService, DatabaseService>();
     builder.Services.AddSingleton<IGoogleCalendarService, GoogleCalendarService>();
+    builder.Services.AddSingleton<IRabbitMQService, RabbitMQService>();
+    builder.Services.AddSingleton<IWebhookHealthService, WebhookHealthService>();
     builder.Services.AddHostedService<Worker>();
 
     // Add Google Calendar Service
@@ -60,7 +64,8 @@ try
     });
 
     var host = builder.Build();
-    host.Run();
+    
+    await host.RunAsync();
 }
 catch (Exception ex)
 {

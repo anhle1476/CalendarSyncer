@@ -5,6 +5,8 @@ using Microsoft.Extensions.Configuration;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace CalendarSync.Services
 {
@@ -103,6 +105,67 @@ namespace CalendarSync.Services
                 
                 return changeType;
             }
+        }
+
+        /// <summary>
+        /// Upserts multiple calendar events into the database in a batch operation.
+        /// </summary>
+        /// <param name="calendarEvents">The collection of calendar events to upsert.</param>
+        /// <returns>Returns a dictionary with event IDs as keys and operation type ("added" or "updated") as values.</returns>
+        public async Task<Dictionary<string, string>> UpsertEventsBatchAsync(IEnumerable<CalendarEvent> calendarEvents)
+        {
+            var eventsList = calendarEvents.ToList();
+            if (!eventsList.Any())
+            {
+                return new Dictionary<string, string>();
+            }
+
+            var results = new Dictionary<string, string>();
+            
+            // Check which events already exist
+            var eventIds = eventsList.Select(e => e.EventID).ToList();
+            const string checkExistsSql = "SELECT EventID FROM CalendarEvents WHERE EventID IN @EventIds;";
+            
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                var existingEventIds = (await connection.QueryAsync<string>(checkExistsSql, new { EventIds = eventIds })).ToHashSet();
+                
+                // Prepare batch upsert SQL
+                const string batchUpsertSql = @"
+                    MERGE CalendarEvents AS target
+                    USING (SELECT @EventID AS EventID) AS source
+                    ON (target.EventID = source.EventID)
+                    WHEN MATCHED THEN
+                        UPDATE SET
+                            Summary = @Summary,
+                            Description = @Description,
+                            StartTime = @StartTime,
+                            EndTime = @EndTime,
+                            UpdatedTime = @UpdatedTime,
+                            Location = @Location,
+                            Status = @Status,
+                            OrganizerEmail = @OrganizerEmail,
+                            Attendees = @Attendees,
+                            Recurrence = @Recurrence
+                    WHEN NOT MATCHED THEN
+                        INSERT (EventID, CalendarID, Summary, Description, StartTime, EndTime, CreatedTime, UpdatedTime, Location, Status, OrganizerEmail, Attendees, Recurrence)
+                        VALUES (@EventID, @CalendarID, @Summary, @Description, @StartTime, @EndTime, @CreatedTime, @UpdatedTime, @Location, @Status, @OrganizerEmail, @Attendees, @Recurrence);
+                ";
+
+                // Execute batch upsert
+                await connection.ExecuteAsync(batchUpsertSql, eventsList);
+                
+                // Determine operation type for each event
+                foreach (var calendarEvent in eventsList)
+                {
+                    string changeType = existingEventIds.Contains(calendarEvent.EventID) ? "updated" : "added";
+                    results[calendarEvent.EventID] = changeType;
+                    _logger.LogDebug("Event {EventId} was {ChangeType}", calendarEvent.EventID, changeType);
+                }
+            }
+            
+            _logger.LogInformation("Batch upserted {Count} events", eventsList.Count);
+            return results;
         }
 
         /// <summary>

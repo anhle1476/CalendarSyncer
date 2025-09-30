@@ -31,6 +31,13 @@ namespace CalendarSync.Services
         Task<string> UpsertEventAsync(CalendarEvent calendarEvent);
 
         /// <summary>
+        /// Upserts multiple calendar events into the database in a batch operation.
+        /// </summary>
+        /// <param name="calendarEvents">The collection of calendar events to upsert.</param>
+        /// <returns>Returns a dictionary with event IDs as keys and operation type ("added" or "updated") as values.</returns>
+        Task<Dictionary<string, string>> UpsertEventsBatchAsync(IEnumerable<CalendarEvent> calendarEvents);
+
+        /// <summary>
         /// Deletes a calendar event from the database.
         /// </summary>
         /// <param name="eventId">The ID of the event to delete.</param>

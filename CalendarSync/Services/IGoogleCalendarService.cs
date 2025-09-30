@@ -9,5 +9,7 @@ namespace CalendarSync.Services
         Task<Events> GetEventsAsync(string syncToken, CancellationToken cancellationToken);
         Task<IList<Event>> GetAllEventsAsync(CancellationToken cancellationToken);
         Task EnsureCalendarExistsAsync(CancellationToken cancellationToken);
+        Task<Channel> RegisterWebhookAsync(string webhookUrl, CancellationToken cancellationToken);
+        Task StopWebhookAsync(string channelId, string resourceId, CancellationToken cancellationToken);
     }
 }

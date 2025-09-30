@@ -135,3 +135,4 @@ _NCrunch*
 .trae
 .idea
 **/logs
+**/node_modules
