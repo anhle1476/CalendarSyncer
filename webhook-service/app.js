@@ -21,13 +21,13 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 
 // Import services
-const rabbitmqService = require('./services/rabbitmq');
-const storageService = require('./services/storage');
+const rabbitmqService = require('./src/services/rabbitmq');
+const storageService = require('./src/services/storage');
 
 // Import routes
-const healthRoutes = require('./routes/health');
-const webhookRoutes = require('./routes/webhook');
-const apiRoutes = require('./routes/api');
+const healthRoutes = require('./src/routes/health');
+const webhookRoutes = require('./src/routes/webhook');
+const apiRoutes = require('./src/routes/api');
 
 // Configuration
 const config = {
@@ -253,7 +253,7 @@ class WebhookApplication {
             console.log('✓ RabbitMQ connection established');
 
             // Initialize storage service
-            storageService.init();
+            storageService.initialize();
             console.log('✓ Storage service initialized');
 
             // Start HTTP server

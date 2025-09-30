@@ -66,10 +66,8 @@ class WebhookDashboard {
         this.showLoading();
         try {
             await Promise.all([
-                this.loadStatistics(),
                 this.loadServiceStatus(),
                 this.loadEvents(),
-                this.loadChannels(),
                 this.loadSystemInfo()
             ]);
             this.updateLastRefreshTime();
@@ -181,9 +179,8 @@ class WebhookDashboard {
                                   data.status === 'degraded' ? 'warning' : 'error');
             }
 
-            // Get uptime from system info or calculate from start time
-            const uptimeSeconds = data.system?.uptime || 0;
-            if (uptime) uptime.textContent = this.formatUptime(uptimeSeconds);
+            // Simply show "Healthy" status instead of uptime
+            if (uptime) uptime.textContent = 'Healthy';
             
             // Get active channels from storage service
             const activeChannelsCount = data.services?.storage?.webhookChannels?.length || 0;
@@ -240,17 +237,19 @@ class WebhookDashboard {
         if (!tableBody) return;
 
         if (events.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="5" class="no-data">No events found</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="7" class="no-data">No events found</td></tr>';
             return;
         }
 
         tableBody.innerHTML = events.map(event => `
             <tr>
-                <td>${this.formatDateTime(event.timestamp)}</td>
-                <td><span class="event-type ${event.type}">${event.type}</span></td>
-                <td>${this.truncateText(event.calendarId, 20)}</td>
-                <td>${this.truncateText(event.eventId || 'N/A', 15)}</td>
-                <td>${this.truncateText(event.channelId || 'N/A', 15)}</td>
+                <td>${this.formatDateTime(event.timestamp || event.receivedAt)}</td>
+                <td><span class="event-type ${event.eventType}">${event.eventType}</span></td>
+                <td>${this.truncateText(event.calendarId, 25)}</td>
+                <td>${this.truncateText(event.resourceId || 'N/A', 20)}</td>
+                <td>${this.truncateText(event.channelId || 'N/A', 20)}</td>
+                <td>${event.messageNumber || 'N/A'}</td>
+                <td><span class="resource-state ${event.resourceState}">${event.resourceState || 'unknown'}</span></td>
             </tr>
         `).join('');
     }
@@ -372,7 +371,6 @@ class WebhookDashboard {
     startAutoRefresh() {
         this.refreshInterval = setInterval(() => {
             if (!this.isLoading) {
-                this.loadStatistics();
                 this.loadServiceStatus();
             }
         }, this.refreshRate);

@@ -22,50 +22,6 @@
 
         <!-- Main Dashboard -->
         <main class="main-content">
-            <!-- Statistics Cards -->
-            <section class="stats-section">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-bell"></i>
-                        </div>
-                        <div class="stat-content">
-                            <h3>Total Events</h3>
-                            <p class="stat-number" id="totalEvents">0</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-plus-circle"></i>
-                        </div>
-                        <div class="stat-content">
-                            <h3>Created</h3>
-                            <p class="stat-number" id="createdEvents">0</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-edit"></i>
-                        </div>
-                        <div class="stat-content">
-                            <h3>Updated</h3>
-                            <p class="stat-number" id="updatedEvents">0</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-trash"></i>
-                        </div>
-                        <div class="stat-content">
-                            <h3>Deleted</h3>
-                            <p class="stat-number" id="deletedEvents">0</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
 
             <!-- Service Status -->
             <section class="status-section">
@@ -83,7 +39,7 @@
                             <span class="status-badge">Unknown</span>
                         </div>
                         <div class="status-details">
-                            <p>Uptime: <span id="webhookUptime">-</span></p>
+                            <p>Status: <span id="webhookUptime">Healthy</span></p>
                             <p>Channels: <span id="activeChannels">0</span></p>
                         </div>
                     </div>
@@ -124,16 +80,18 @@
                         <table class="events-table" id="eventsTable">
                             <thead>
                                 <tr>
-                                    <th>Time</th>
-                                    <th>Type</th>
-                                    <th>Calendar</th>
-                                    <th>Event ID</th>
-                                    <th>Channel</th>
+                                    <th>Timestamp</th>
+                                    <th>Event Type</th>
+                                    <th>Calendar ID</th>
+                                    <th>Resource ID</th>
+                                    <th>Channel ID</th>
+                                    <th>Message #</th>
+                                    <th>State</th>
                                 </tr>
                             </thead>
                             <tbody id="eventsTableBody">
                                 <tr>
-                                    <td colspan="5" class="no-data">Loading events...</td>
+                                    <td colspan="7" class="no-data">Loading events...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -141,18 +99,7 @@
                 </div>
             </section>
 
-            <!-- Webhook Channels -->
-            <section class="channels-section">
-                <div class="section-header">
-                    <h2><i class="fas fa-broadcast-tower"></i> Webhook Channels</h2>
-                </div>
-                
-                <div class="channels-container">
-                    <div class="channels-grid" id="channelsGrid">
-                        <div class="no-data">Loading channels...</div>
-                    </div>
-                </div>
-            </section>
+
 
             <!-- System Information -->
             <section class="system-section">
@@ -182,11 +129,7 @@
             </section>
         </main>
 
-        <!-- Footer -->
-        <footer class="footer">
-            <p>&copy; 2024 Calendar Sync Service - Webhook Dashboard</p>
-            <p>Last updated: <span id="lastUpdated">-</span></p>
-        </footer>
+
     </div>
 
     <!-- Loading Overlay -->
