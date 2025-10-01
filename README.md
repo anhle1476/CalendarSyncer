@@ -15,18 +15,25 @@ The Calendar Sync Service is built using a microservices architecture with the f
    - Database operations and event processing
    - UDP notification system
 
-2. **Webhook Service (Node.js/Express)**
+2. **Calendar Desktop GUI (.NET 8 WPF Application)**
+   - Real-time desktop monitoring application
+   - Displays synchronized calendar events from database
+   - Receives UDP notifications from Calendar Sync Service
+   - Live event table with refresh functionality
+   - UDP message log viewer for debugging
+
+3. **Webhook Service (Node.js/Express)**
    - Receives Google Calendar webhook notifications
    - Publishes events to RabbitMQ message queue
    - Health monitoring and web dashboard
    - HTTPS support for production
 
-3. **RabbitMQ Message Broker**
+4. **RabbitMQ Message Broker**
    - Handles asynchronous message processing
    - Ensures reliable event delivery
    - Provides message persistence and durability
 
-4. **SQL Server Database**
+5. **SQL Server Database**
    - Stores calendar events and sync state
    - Maintains sync tokens for incremental updates
    - Event history and audit trail
@@ -46,13 +53,20 @@ The Calendar Sync Service is built using a microservices architecture with the f
 │   Database      │    │ Service (.NET)   │    │   Processing    │
 │                 │    │ Windows Service  │    │                 │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │ UDP Notification│
-                       │ Service         │
-                       │ Port: 11004     │
-                       └─────────────────┘
+         ▲                       │
+         │                       ▼
+         │              ┌─────────────────┐
+         │              │ UDP Notification│
+         │              │ Service         │
+         │              │ Port: 11004     │
+         │              └─────────────────┘
+         │                       │
+         │                       ▼
+         │              ┌─────────────────┐
+         └──────────────│ Calendar Desktop│
+                        │ GUI (WPF)       │
+                        │ Event Viewer    │
+                        └─────────────────┘
 ```
 
 ## 🚀 Key Features
@@ -229,6 +243,20 @@ dotnet restore
 dotnet run
 ```
 
+#### 4. Run Calendar Desktop GUI (Optional)
+
+```bash
+cd CalendarDesktop
+dotnet restore
+dotnet run
+```
+
+The Calendar Desktop application provides:
+- Real-time view of synchronized calendar events
+- UDP notification monitoring from the sync service
+- Event table with refresh functionality
+- Debug information for troubleshooting
+
 ### Project Structure
 
 ```
@@ -245,6 +273,15 @@ CalendarSyncService/
 │   │   └── ISyncOrchestrator.cs         # Orchestrator interface
 │   ├── Utilities/               # Helper utilities
 │   └── Worker.cs                # Main background service
+├── CalendarDesktop/             # WPF Desktop GUI Application
+│   ├── MainWindow.xaml          # Main window UI layout
+│   ├── MainWindow.xaml.cs       # Main window code-behind
+│   ├── Services/                # Service layer
+│   │   ├── DatabaseService.cs   # Database operations
+│   │   └── UdpListenerService.cs# UDP notification listener
+│   ├── Models/                  # Data models
+│   │   └── CalendarEvent.cs     # Calendar event model
+│   └── appsettings.json        # Configuration
 ├── webhook-service/             # Node.js webhook receiver
 │   ├── src/
 │   │   ├── routes/             # Express routes
